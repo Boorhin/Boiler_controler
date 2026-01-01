@@ -7,8 +7,7 @@ A way to control a Grant Combi boiler with a raspberry pi 5 with Python and Dash
 * 2 channel Triac from Waveshare https://www.waveshare.com/wiki/2-CH_TRIAC_HAT
 * Temperature and humidity sensor from Pimoroni SHT45 (others will do)
 * 4 jumper cables
-* 5 ways connector (or bus bar)
-* 3 ways connector (or bus bar)
+* 4 ways connector (or bus bar)
 * A USB-C PD wall socket
 * USB-C cable
 * A 7" touchscreen from Waveshare
@@ -19,17 +18,16 @@ A way to control a Grant Combi boiler with a raspberry pi 5 with Python and Dash
 ## Hardware setup 
 In my case, the boiler had a control unit that was only a timer. So I had a spur from my consummer unit to a central place in the house with a switchable 5A blow fuse. Grant recommands 5A to protect the boiler. Personnally I would have prefered a 5A breaker in the consummer unit rather than a switch you could mistake for the nearby light switch.
 * Switch off the spur of the mains
-* Wire live of switch to 3 ways connector (or bus bar)
-* Wire neutral of switch to 5 ways connector
-* Wire boiler to area near fuse switch (LNE). Connect Earth to switch Earth, connect neutral to 5 ways connector. connect live to five ways connector.
-* Pull a wire with 2 cores for live of Central Heating (CH) and instant Hot Water (HW) from the boiler to the place you are setting up. The schematics are in Grant boiler manuals with a 5 cores connector. In my case that was already there.
-* Wire USB-C PD wall socket to fuse switch
+* Choose a space to place your screen backplate, the USB C PD wall socket and the RPi enclosure. Fix them all / mark them, beware of cable lengths etc. 
+* Connect main to switch input
+* connect switch output to boiler supply, to USB-C PD wall socket.
+* Pull a 2 core wire (L/N) from USBC wall socket to RPi enclosure. Connect live core to inlet of Triac, neutral to a 4-ways connector.
 * Place the Triac hat on the raspberry header. Use spacers to maintain it securely. use spacers to add piece of enclosure away from Triac radiator.
-* connect the 3 neutral from triac to 5 ways connector
-* connect live from 3 ways connector to input live from Triac
+* from the 4 ways connector, pull 3 neutral cores to each neutral of the Triac. Neutral is shared and only live will send instructions to boiler.
+* Pull a wire with 2 cores for live of Central Heating (CH) and instant Hot Water (HW) from the boiler to the place you are setting up. The schematics are in Grant boiler manuals with a 5 cores connector. In my case that was already there.
 * connect live from CH to live channel 1 of Triac, connect live HW to channel 2
 * Set Triac to use I2C communication (switch + 2 jumpers to move)
-* connect jumpers to Triac header for power supply and I2C to the temperature and humidity sensor.
+* connect jumper cables to Triac header for power supply and I2C. Connect jumper cables to the temperature and humidity sensor.
 * connect screen to raspberry (HDMI+USB)
 * connect USB-C to power socket (don't power up yet)
 * obviously there will be plenty of work setting this on a wall you can make it complicated or simple. At the moment it is a prototype so I simply use backplates and screw them on the plasterboard as I know that wall will be demolished in the future.
@@ -45,7 +43,7 @@ In my case, the boiler had a control unit that was only a timer. So I had a spur
 
 ## Startup the script
 Open a shell in your project, run `python3 dashprod.py`
-open http://localhost:8888/ with your favourite browser, chromium is the RPi default one and it does. I recommend to press F11 to put it full screen.
+open http://localhost:8888/ with your favourite browser, chromium is the RPi default one and it does the job. I recommend to press F11 to put it full screen.
 You can live edit the script for different layouts, levels of logging etc. As long as you don't break the script it will restart automatically.
 
 ## automating the script at startup
@@ -63,6 +61,12 @@ User=user
 [Install]
 WantedBy=multi-user.target
 ```
+chmod 755 ~/Dekstop/ch/dashprod.py
+sudo nano /etc/systemd/system/ch.service
+sudo systemctl daemon-reload
+sudo systemctl enable sensing
+sudo systemctl start sensing
+
 
 ## TO DO
 * Screensaving: at the moment it doesn't wake up when activated could be an OS issue.
