@@ -36,12 +36,12 @@ logger = logging.getLogger('CH_logger')
 logger.setLevel(logging.DEBUG)
 
 def init_PID(target_temp=16):
-    logger.info(f'Initialising PID with target {target_temp}')  
+    logger.info(f'Initialising PID with target {target_temp}')
     Kp, Ki, Kd = 1, 0.1, 0.05
     pid = PID(Kp, Ki, Kd, setpoint=target_temp, \
                   output_limits=(0, target_temp+.5), \
                   auto_mode=True, proportional_on_measurement=False)
-    return pid   
+    return pid
 
 def test_channel(scr,chan):
     logger.info(f'Testing channel {chan}')
@@ -105,7 +105,8 @@ def init_graph(sampling=5, length=2):
     date=np.arange(t,t+timedelta(days=length), timedelta(minutes=sampling),dtype='datetime64[s]').astype(datetime)
     temp=np.ones(len(date))*np.nan
     rh  =np.ones(len(date))*np.nan
-    return {"temp":temp,"rh":rh,"date":date[::-1]}
+    on=np.zeros(len(date)).astype('bool')
+    return {"temp":temp,"rh":rh,"date":date[::-1],"on":on}
 
 def roll_array(arr):
    arr[1:]=arr[:-1]
@@ -119,6 +120,27 @@ def populate(sensor,variables):
         arr=roll_array(arr)
         arr[0]=v
 
+def pop_boiler(variables):
+    variables['on']=roll_array(variables['on'])
+    variables['on'][0]=variables['boiler_flag']
+
+def selectemp(timer,lt,ht):
+    now=datetime.now()
+    h=now.hour+now.minute/60
+    if timer[0]<h and h<timer[1]:
+        logger.debug('High temp stat')
+        return ht
+    else:
+        logger.debug('low temp stat')
+        return lt
+
+def reinit_PID(variables,t):
+    logger.info(f"reinitialising PID with target {t}")
+    variables['pid']=init_PID(t)
+    if 'P' in variables.keys():
+         variables['pid'].set_auto_mode(True, last_output=variables['P'])
+    variables['target']=t
+
 #INITIAL
 logger.debug('Initialising variables')
 sampling=0.25 #minutes
@@ -128,8 +150,11 @@ scr=init_triac()
 variables=init_graph(sampling, length)
 variables["on_CH"], variables["off_CH"]=[],[]
 variables['CH_flag']=False
-
-#global variables
+variables['boiler_flag']=False
+variables['target']=16
+variables['pid']=init_PID()
+variables["conso"]=3.4 # nozzle l/h
+variables["conso"] *=sampling/60 #per time units
 
 onButtonStyle =dict(backgroundColor='skyblue')
 offButtonStyle=dict(backgroundColor='#32383e',borderColor='515960')
@@ -139,7 +164,9 @@ app.layout = dbc.Container([
     dbc.Tabs(id='all_tabs',
                     children= [
         dbc.Tab(tab1_layout(),label='dashboard',tab_id='tab-main',),
-        dbc.Tab(tab2_layout(variables, sampling),label='monitoring',tab_id='tab-monit')
+        dbc.Tab(tab3_layout(),label="settings",tab_id='tab-settings'),
+        dbc.Tab(tab2_layout(variables, sampling),label='monitoring',tab_id='tab-monit'),
+        dbc.Tab(tab4_layout(variables),label='boiler',tab_id='tab-boiler')
         ])
 ], fluid=True, className='dbc')
 
@@ -148,27 +175,41 @@ app.layout = dbc.Container([
     Output('power-button-CH', 'on'),
     Output('thermo','value'),
     Output('hydro','value'),
-    Output('PID_display','value')],
-    Input("temperature-update", "n_intervals"))
-def gen_temps(interval):
+    Output('PID_display','value'),
+    Output('boiler','figure')],
+    [Input("temperature-update", "n_intervals"),
+    Input('l_temp_slider','value'),
+    Input('h_temp_slider','value'),
+    Input('timer','value')],
+    State('power-button-HW', 'on')
+)
+def gen_temps(interval,lt,ht,timer,HW):
     """
     generate the temperature graph
     :params interval: update the graph based on that interval
     """
+    t=selectemp(timer,lt,ht)
+    if variables['target'] != t:
+        reinit_PID(variables,t)
     populate(sensor,variables)
     variables['P']=variables['pid'](variables['temp'][0])
     logger.debug(f'temp:{variables['temp'][0]}, P {variables['P']}')
     if variables['P']>variables['target']:
         logger.debug('turning on from thermostat')
         variables['CH_flag']=True
+        variables['boiler_flag']=True
     if variables['P']<variables['target']:
         logger.debug('turning off from thermostat')
         variables['CH_flag']=False
+    if HW:
+        variables['boiler_flag']=True
+    pop_boiler(variables)
     return [mk_monit_fig(variables), 
             variables['CH_flag'],
             variables['temp'][0],
             variables['rh'][0],
-            round(variables['P'],2)]
+            round(variables['P'],2),
+            mk_boiler_fig(variables)]
 
 @app.callback(
     Output('power-button-CH-result', 'children'),
@@ -180,18 +221,14 @@ def update_CH_b(on):
         txt,style= 'ON', dict(color='firebrick',textAlign= 'center', padding='5px')
         if not variables['CH_flag']:
             logger.debug(f"pressing ON")
-            #variables['CH_flag']=True
-            #turn_on(1,scr)
+        turn_on(1,scr)
     if not on:
         txt,style= 'OFF', dict(color='skyblue',textAlign= 'center', padding='5px')
         if variables['CH_flag']:
-            #variables['CH_flag']=False
-            #variables['off_CH'].append(datetime.now())
-            #turn_off(1,scr)
             logger.debug(f"pressing OFF")
-        
+        turn_off(1,scr)
     return txt,style
-    
+
 @app.callback(
     Output('power-button-HW-result', 'children'),
     Output('power-button-HW-result', 'style'),
@@ -205,17 +242,6 @@ def update_HW_b(on):
         turn_off(2,scr)
         return 'OFF', dict(color='skyblue',textAlign= 'center', padding='5px')
 
-@app.callback(
-    Output('blank', 'children'),
-    Input('Temp_knob','value'),
-    )
-def regulateCH(t):
-    variables['pid']=init_PID(t)
-    if 'P' in variables.keys():
-         variables['pid'].set_auto_mode(True, last_output=variables['P'])
-    variables['target']=t
-    return None
-    
 if __name__ == '__main__':
     try:
         app.run(host='localhost',port=8888,debug=True)
