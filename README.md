@@ -61,11 +61,26 @@ User=user
 [Install]
 WantedBy=multi-user.target
 ```
-chmod 755 ~/Dekstop/ch/dashprod.py
-sudo nano /etc/systemd/system/ch.service
-sudo systemctl daemon-reload
-sudo systemctl enable sensing
-sudo systemctl start sensing
+
+Allow system to execute it
+
+```chmod 755 ~/Dekstop/ch/dashprod.py```
+
+Place the file in systemd
+
+```sudo nano /etc/systemd/system/ch.service```
+
+Reload all daemons
+
+```sudo systemctl daemon-reload```
+
+Enable your service
+
+```sudo systemctl enable ch```
+
+Start your service
+
+```sudo systemctl start ch```
 
 
 ## TO DO
