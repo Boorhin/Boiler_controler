@@ -4,7 +4,7 @@ import dash
 from dash import dcc as dcc
 from dash import html as html
 import dash_bootstrap_components as dbc
-from datetime import datetime
+from datetime import datetime, timedelta
 import dash_daq as daq
 import numpy as np
 
@@ -67,42 +67,28 @@ def current_mes():
             step=5,
             max= 100,
             min=0,
-            #size=200,
         )),
-        dbc.Col(
+        dbc.Col([
         daq.LEDDisplay(
             id='PID_display',
             label="PID",
             color="#FF5E5E"
-            )),
+            ),
+        daq.LEDDisplay(
+            id='H_display',
+            label="Running hours",
+            color="#FF5E5E"),
+        ]),
         ])
     ])
     ])
 
-def temp_knob():
-    return dbc.Card([
-    dbc.CardHeader('Thermostat'),
-    dbc.CardBody([
-        daq.Knob(
-            id='Temp_knob',
-            color='firebrick',
-            size=150,
-            value=16,
-            min=12,
-            max=22,
-            style={'fill':'#32383e'},
-            showCurrentValue=True
-            )
-            ],)
-    ])
-
 def tab1_layout():
-    return dbc.Card([  
+    return dbc.Card([
     dbc.Row([
             dbc.Col([
                 dbc.Row([switch_card(),
                     html.Div(id='blank')]),
-                #dbc.Row(temp_knob())
                     ]),
             dbc.Col([current_mes()]),]),
     ]),
@@ -139,7 +125,7 @@ def hours(h=120):
     return dbc.Card([dbc.CardHeader('High temperature timer'),
     dbc.CardBody([
          dcc.RangeSlider(id='timer',
-    min=0, max=24, step=0.25, value=[6.5,20.5],
+    min=0, max=24, step=0.25, value=[5.75,20.5],
     marks={i: '{:02d}:00'.format(i) for i in range(0,25)},
     tooltip={"placement": "bottom", 
     "always_visible": True, 
@@ -157,32 +143,26 @@ def tab3_layout():
 
 
 def mk_monit_fig(variables):
-    trace1= go.Scatter(x=variables['date'][::-1], y=variables['temp'][::-1],
+    trace1= go.Scatter(x=variables['date'], y=variables['temp'],
                 name="Temperature corridor",
                 line=dict(color='firebrick', width=2),
                 yaxis='y')
-    trace2= go.Scatter(x=variables['date'][::-1], y=variables['rh'][::-1],
+    trace2= go.Scatter(x=variables['date'], y=variables['rh'],
                 name="humidity corridor",line=dict(color='skyblue', width=2),
                 yaxis='y2')
     fig_p = make_subplots(specs=[[{"secondary_y": True}]])
     fig_p.add_trace(trace1)
     fig_p.add_trace(trace2)
-    if len(variables["on_CH"])>0:
-        i=0    
-        while i <len(variables["on_CH"]):            
-            fig_p.add_vrect(x0=variables["on_CH"][i],
-                x1=variables["off_CH"][i], 
-                fillcolor="orange",line=dict(width=0), opacity=0.2)
-            #print(i, variables["on_CH"], variables["off_CH"])
-            i+=1
+    fig_p.add_hline(y=variables['lt'], line_dash="dash", line_color='firebrick', secondary_y=False)
+    fig_p.add_hline(y=variables['ht'], line_dash="dash", line_color='firebrick', secondary_y=False)
     fig_p.update_yaxes(title='Temperature', color='firebrick',
                     showgrid=False, secondary_y=False)
     fig_p.update_yaxes(title='Humidity', color='skyblue',
                     showgrid=False, secondary_y=True)
-    fig_p.update_xaxes(range=[variables['date'].min(), variables['date'].max()])
+    fig_p.update_xaxes(range=[variables['date'][-1]-timedelta(hours=variables['window']), variables['date'][-1]])
     return fig_p
 
-def tab2_layout(variables, sampling):
+def tab2_layout(variables):
     return dbc.Card([
         dbc.CardHeader("Sensors"),
         dbc.CardBody([
@@ -192,18 +172,19 @@ def tab2_layout(variables, sampling):
                     )),
                 dcc.Interval(
                     id="temperature-update",
-                    interval=int(sampling*1000*60),
+                    interval=int(variables['sampling']*1000*60),
                     n_intervals=0,
                     ),
             ]),
         ])
 def mk_boiler_fig(variables):
-    trace3= go.Scatter(x=variables['date'][::-1], y=variables['on'][::-1],
+    trace3= go.Scatter(x=variables['date'], y=variables['on'],
                 name="boiler activity",
                 line=dict(color='orange', width=2,shape='hvh'),
                 yaxis='y')
-    totaluse=variables["conso"]*variables['on'][::-1].cumsum()
-    trace4= go.Scatter(x=variables['date'][::-1], y=totaluse,
+    totaluse=variables["sampling"]/60*variables['on'].cumsum()+variables['offset']
+    variables['run']=max(totaluse)
+    trace4= go.Scatter(x=variables['date'], y=totaluse,
                 name="total consumption",line=dict(color='white', width=2),
                 yaxis='y2')
     fig_b = make_subplots(specs=[[{"secondary_y": True}]])
@@ -211,14 +192,15 @@ def mk_boiler_fig(variables):
     fig_b.add_trace(trace4)
     fig_b.update_yaxes(title='Activity', color='orange',
                     showgrid=False, secondary_y=False)
-    fig_b.update_yaxes(title='Consumption (l)', color='white',
+    fig_b.update_yaxes(title='running hours', color='white',
                     showgrid=False, secondary_y=True)
-    fig_b.update_xaxes(range=[variables['date'].min(), variables['date'].max()])
+    fig_b.update_xaxes(range=[variables['date'][-1]-timedelta(hours=variables['window']), variables['date'][-1]])
+    variables['offset']=min(totaluse)
     return fig_b
 
 def tab4_layout(variables):
     return dbc.Card([
-    dbc.CardHeader('Boiler'),
+    dbc.CardHeader(f'Boiler activity over the last {variables["length"]} days'),
     dbc.CardBody([
         dbc.Row(dcc.Graph(
             id='boiler',
@@ -226,3 +208,24 @@ def tab4_layout(variables):
             )
         )])
     ])
+
+def tab5_layout(variables):
+    return dbc.Card([
+    dbc.CardHeader('Miscellaneous parameters'),
+    dbc.CardBody([
+        dbc.Row([
+            dbc.Card([
+            dbc.CardHeader('Graphs windows in hours'),
+            dbc.CardBody([
+                dcc.Slider(id='window',
+                       min=12,
+                       max=168, step=12, value=variables['window'],
+                       tooltip={"placement": "bottom",
+                       "always_visible": True,
+                        "style": {"color": "LightSteelBlue", "fontSize": "20px"}}
+                        ),
+                ])
+            ])
+        ]),
+        dbc.Row()
+    ])])
