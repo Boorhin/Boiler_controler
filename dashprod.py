@@ -33,13 +33,42 @@ app.title="CH Dashboard"
 # INIT LOGGER
 logging.basicConfig(format='%(levelname)s:%(asctime)s__%(message)s', datefmt='%m/%d/%Y %I:%M:%S')
 logger = logging.getLogger('CH_logger')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+
+def init_data_record():
+    try:
+        lastfile=sorted([os.path.join('logs',l) for l in os.listdir('logs')],key=os.path.getmtime)[-1]
+        logger.debug(f'selecting file {lastfile})')
+        with open(lastfile,'r') as l:
+            logger.debug(f'file {lastfile} opened')
+            for line in l:
+                pass
+            lasthours=line.strip().split('\t')[-1]
+        logger.info(f'Adding {lasthours} hours of activity from former logs.')
+    except:
+        logger.error('No former log or invalid log files. No former hours added')
+        lasthours=0
+    timestamp='{:%Y-%m-%d_%H:%M:%S}'.format(datetime.now())
+    logger.info(f'Initialising data file {timestamp}.log')
+    variables=['datetime','temp','Rh','activity(h)']
+    with open(f'logs{os.sep}{timestamp}.log','w') as f:
+        for col in variables:
+            f.write(f'{col}\t')
+        f.write('\n')
+    return timestamp,float(lasthours)
+
+def write_record(variables):
+    with open(f"logs{os.sep}{variables['datalog']}.log",'a') as f:
+        f.write('{:%Y-%m-%d_%H:%M:%S}\t'.format(variables['date'][0]))
+        f.write(f'{round(variables['temp'][0],1)}\t')
+        f.write(f'{round(variables['rh'][0],1)}\t')
+        f.write(f"{round(variables['run']+variables['old run'],2)}\n")
 
 def init_PID(target_temp=16):
     logger.info(f'Initialising PID with target {target_temp}')
     Kp, Ki, Kd = 1, 0.1, 0.05
     pid = PID(Kp, Ki, Kd, setpoint=target_temp, \
-                  output_limits=(0, target_temp+.5), \
+                  output_limits=(0, target_temp+.25), \
                   auto_mode=True, proportional_on_measurement=False)
     return pid
 
@@ -77,12 +106,12 @@ def turn_all_off(scr):
         turn_off(i,scr)
 
 def turn_on(channel,scr):
-    logger.info(f'Turning on channel {channel}')
+    logger.debug(f'Turning on channel {channel}')
     scr.ChannelEnable(channel)
     scr.VoltageRegulation(channel,179)
 
 def turn_off(channel,scr):
-    logger.info(f'Turning off channel {channel}')
+    logger.debug(f'Turning off channel {channel}')
     scr.VoltageRegulation(channel,0)
     scr.ChannelDisable(channel)
 
@@ -94,37 +123,38 @@ class fksensor:
         return random.randrange(45,100)
 
 def init_sensor():
-    logger.debug('Initialising sensor')
+    logger.info('Initialising sensor')
     import board
     import adafruit_sht4x
     return adafruit_sht4x.SHT4x(board.I2C())
 
-def init_graph(sampling=5, length=2):
-    logger.debug('initialising graph')
-    t=datetime.now()+timedelta(seconds=60)
-    date=np.arange(t,t+timedelta(days=length), timedelta(minutes=sampling),dtype='datetime64[s]').astype(datetime)
-    temp=np.ones(len(date))*np.nan
-    rh  =np.ones(len(date))*np.nan
-    on=np.zeros(len(date)).astype('bool')
-    return {"temp":temp,"rh":rh,"date":date[::-1],"on":on}
+def init_graph(variables):
+    logger.info('initialising graph')
+    t=datetime.now()+timedelta(seconds=5)
+    variables['date']=np.ones((int(timedelta(days=variables['length'])/timedelta(minutes=variables['sampling']))), dtype='datetime64[ms]').astype(datetime)
+    variables['temp']=np.ones(len(variables['date']))*np.nan
+    variables['rh']  =np.ones(len(variables['date']))*np.nan
+    variables['on']=np.zeros(len(variables['date'])).astype('bool')
+    return variables
 
-def roll_array(arr):
-   arr[1:]=arr[:-1]
-   return arr
+def roll_array(arr,v):
+    arr[:-1]=arr[1:]
+    arr[-1]=v
+    return arr
 
 def populate(sensor,variables):
     logger.debug('populating data')
     t,h=sensor.temperature,sensor.relative_humidity
     d=datetime.now()
     for arr,v in zip([variables['temp'],variables['rh'],variables['date']],[t,h,d]):
-        arr=roll_array(arr)
-        arr[0]=v
+        arr=roll_array(arr,v)
 
 def pop_boiler(variables):
-    variables['on']=roll_array(variables['on'])
-    variables['on'][0]=variables['boiler_flag']
+    logger.debug('populating boiler data')
+    variables['on']=roll_array(variables['on'],variables['boiler_flag'])
 
 def selectemp(timer,lt,ht):
+    logger.debug('selecting thermostat value according to timer')
     now=datetime.now()
     h=now.hour+now.minute/60
     if timer[0]<h and h<timer[1]:
@@ -142,19 +172,26 @@ def reinit_PID(variables,t):
     variables['target']=t
 
 #INITIAL
-logger.debug('Initialising variables')
-sampling=0.25 #minutes
-length=2 #days
+logger.info('Initialising variables')
 sensor=init_sensor()
 scr=init_triac()
-variables=init_graph(sampling, length)
+variables={}
+variables['sampling']=.25  #minutes
+variables['length']=7 #days
+variables=init_graph(variables)
 variables["on_CH"], variables["off_CH"]=[],[]
 variables['CH_flag']=False
 variables['boiler_flag']=False
 variables['target']=16
+variables['lt']=16
+variables['ht']=19
 variables['pid']=init_PID()
-variables["conso"]=3.4 # nozzle l/h
-variables["conso"] *=sampling/60 #per time units
+#variables["conso"]=3.4 # nozzle l/h
+variables["conso"] =variables['sampling']/60 #hours of use
+variables['run']=0
+variables['datalog'],variables['old run']=init_data_record()
+variables['offset']=0
+variables['window']= variables['length']*24 #graphing
 
 onButtonStyle =dict(backgroundColor='skyblue')
 offButtonStyle=dict(backgroundColor='#32383e',borderColor='515960')
@@ -165,8 +202,9 @@ app.layout = dbc.Container([
                     children= [
         dbc.Tab(tab1_layout(),label='dashboard',tab_id='tab-main',),
         dbc.Tab(tab3_layout(),label="settings",tab_id='tab-settings'),
-        dbc.Tab(tab2_layout(variables, sampling),label='monitoring',tab_id='tab-monit'),
-        dbc.Tab(tab4_layout(variables),label='boiler',tab_id='tab-boiler')
+        dbc.Tab(tab2_layout(variables),label='monitoring',tab_id='tab-monit'),
+        dbc.Tab(tab4_layout(variables),label='boiler',tab_id='tab-boiler'),
+        dbc.Tab(tab5_layout(variables),label='Misc', tab_id='tab-misc'),
         ])
 ], fluid=True, className='dbc')
 
@@ -176,24 +214,33 @@ app.layout = dbc.Container([
     Output('thermo','value'),
     Output('hydro','value'),
     Output('PID_display','value'),
-    Output('boiler','figure')],
+    Output('boiler','figure'),
+    Output('H_display','value'),],
     [Input("temperature-update", "n_intervals"),
     Input('l_temp_slider','value'),
     Input('h_temp_slider','value'),
-    Input('timer','value')],
-    State('power-button-HW', 'on')
-)
-def gen_temps(interval,lt,ht,timer,HW):
+    Input('timer','value'),
+    Input('window','value')],
+    State('power-button-HW', 'on'))
+def gen_temps(interval,lt,ht,timer,window,HW):
     """
     generate the temperature graph
     :params interval: update the graph based on that interval
+    :params lt: Low thermostat value
+    :params ht: high thermostat value
+    :params timer: list of hour range when high thermostat is active
+    :params HW: bool if hot water button engaged
     """
+    variables['window']=window
     t=selectemp(timer,lt,ht)
+    variables['lt']=lt
+    variables['ht']=ht
     if variables['target'] != t:
         reinit_PID(variables,t)
     populate(sensor,variables)
-    variables['P']=variables['pid'](variables['temp'][0])
-    logger.debug(f'temp:{variables['temp'][0]}, P {variables['P']}')
+    variables['P']=variables['pid'](variables['temp'][-1])
+    logger.debug(f'temp:{variables['temp'][-1]}, P {variables['P']}')
+    variables['boiler_flag']=False
     if variables['P']>variables['target']:
         logger.debug('turning on from thermostat')
         variables['CH_flag']=True
@@ -204,18 +251,19 @@ def gen_temps(interval,lt,ht,timer,HW):
     if HW:
         variables['boiler_flag']=True
     pop_boiler(variables)
+    write_record(variables)
     return [mk_monit_fig(variables), 
             variables['CH_flag'],
-            variables['temp'][0],
-            variables['rh'][0],
+            variables['temp'][-1],
+            variables['rh'][-1],
             round(variables['P'],2),
-            mk_boiler_fig(variables)]
+            mk_boiler_fig(variables),
+            round(variables['run']+variables['old run'],1),]
 
 @app.callback(
     Output('power-button-CH-result', 'children'),
     Output('power-button-CH-result', 'style'),
-    Input('power-button-CH', 'on'),
-)
+    Input('power-button-CH', 'on'),)
 def update_CH_b(on):
     if on:
         txt,style= 'ON', dict(color='firebrick',textAlign= 'center', padding='5px')
@@ -242,11 +290,13 @@ def update_HW_b(on):
         turn_off(2,scr)
         return 'OFF', dict(color='skyblue',textAlign= 'center', padding='5px')
 
+
+
 if __name__ == '__main__':
     try:
-        app.run(host='localhost',port=8888,debug=True)
-    except KeyboardInterrupt:
-        print('shutting down')
+        app.run(host='localhost',port=8888,debug=True, use_reloader=False)
+    except:
+        logger.warning('shutting down')
         turn_all_off(scr)
         sleep(1)
         print('Bye!')
