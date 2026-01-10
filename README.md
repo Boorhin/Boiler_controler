@@ -19,6 +19,7 @@ A way to control a Grant Combi boiler with a raspberry pi 5 with Python and Dash
 In my case, the boiler had a control unit that was only a timer. So I had a spur from my consumer unit to a central place in the house with a switchable 5A blow fuse. Grant recommends 5A to protect the boiler. Personally I would have preferred a 5A breaker in the consumer unit rather than a switch you could mistake for the nearby light switch.
 * Switch off the spur of the mains
 * Choose a space to place your screen backplate, the USB C PD wall socket and the RPi enclosure. Fix them all / mark them, beware of cable lengths etc. In my case I had to "vent" the enclosure. The RPi5 generates a lot of heat so it is really necessary.
+
 ![guided venting holes with paper](./assets/img/venting.png)
 * Connect main to switch input
 * connect switch output to boiler supply, to USB-C PD wall socket.
@@ -29,6 +30,7 @@ In my case, the boiler had a control unit that was only a timer. So I had a spur
 * connect live from CH to live channel 1 of Triac, connect live HW to channel 2
 * Set Triac to use I2C communication (switch + 2 jumpers to move)
 * connect jumper cables to Triac header for power supply and I2C. Connect jumper cables to the temperature and humidity sensor. Keep the sensor away from screen and enclosure to not disturb readings
+
 ![Assembly without screen](./assets/img/assembly_noscreen.jpg)
 * connect screen to raspberry (HDMI+USB)
 * connect USB-C to power socket (don't power up yet)
@@ -46,6 +48,7 @@ In my case, the boiler had a control unit that was only a timer. So I had a spur
 ## Startup the script
 Open a shell in your project, run `python3 dashprod.py`
 open http://localhost:8888/ with your favourite browser, chromium is the RPi default one and it does the job. I recommend to press F11 to put it full screen. And tadaaah!
+
 ![Final assembly](./assets/img/final_assembly.jpg)
 You can live edit the script for different layouts, levels of logging etc. As long as you don't break the script it will restart automatically.
 
@@ -67,25 +70,31 @@ WantedBy=multi-user.target
 
 Allow system to execute it
 
-```chmod 755 ~/Dekstop/ch/dashprod.py```
+```
+chmod 755 ~/Dekstop/ch/dashprod.py
+```
 
 Place the file in systemd
 
-```sudo nano /etc/systemd/system/ch.service
+```
+sudo nano /etc/systemd/system/ch.service
 ```
 
 Reload all daemons
 
-```sudo systemctl daemon-reload
+```
+sudo systemctl daemon-reload
 ```
 
 Enable your service
 
-```sudo systemctl enable ch
+```
+sudo systemctl enable ch
 ```
 Start your service
 
-```sudo systemctl start ch
+```
+sudo systemctl start ch
 ```
 
 
@@ -110,11 +119,13 @@ variables['timer']=[5.75,20.5] #in decimal hours
 ### Monitoring tab
 
 Produces a graph of temperature and relative humidity through time. Also shows the high and low temperature limits of the setting tab. The width (time range) of the plot is specified in the `Misc tab`.
+
 ![Example of monitoring graph](./assets/img/example_monitor.png)
 
 ### Boiler tab
 
 Produces a graph of when the boiler is on (true) and the cumulative hours of use __since it booted__. If you want the total hours by cumulating all the hours since starting logging check led display in `dashbard tab`. The width (time range) of the plot is specified in the `Misc tab`.
+
 ![Example of boiler graph](./assets/img/example_boiler.png)
 
 ### Misc tab
