@@ -19,7 +19,7 @@ A way to control a Grant Combi boiler with a raspberry pi 5 with Python and Dash
 In my case, the boiler had a control unit that was only a timer. So I had a spur from my consumer unit to a central place in the house with a switchable 5A blow fuse. Grant recommends 5A to protect the boiler. Personally I would have preferred a 5A breaker in the consumer unit rather than a switch you could mistake for the nearby light switch.
 * Switch off the spur of the mains
 * Choose a space to place your screen backplate, the USB C PD wall socket and the RPi enclosure. Fix them all / mark them, beware of cable lengths etc. In my case I had to "vent" the enclosure. The RPi5 generates a lot of heat so it is really necessary.
-![guided venting holes with paper](./assets/img/venting.jpg)
+![guided venting holes with paper](./assets/img/venting.png)
 * Connect main to switch input
 * connect switch output to boiler supply, to USB-C PD wall socket.
 * Pull a 2 core wire (L/N) from USBC wall socket to RPi enclosure. Connect live core to inlet of Triac, neutral to a 4-ways connector.
