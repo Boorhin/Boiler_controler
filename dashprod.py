@@ -185,6 +185,7 @@ variables['boiler_flag']=False
 variables['target']=16
 variables['lt']=16
 variables['ht']=19
+variables['timer']=[5.75,20.5]
 variables['pid']=init_PID()
 #variables["conso"]=3.4 # nozzle l/h
 variables["conso"] =variables['sampling']/60 #hours of use
@@ -201,7 +202,7 @@ app.layout = dbc.Container([
     dbc.Tabs(id='all_tabs',
                     children= [
         dbc.Tab(tab1_layout(),label='dashboard',tab_id='tab-main',),
-        dbc.Tab(tab3_layout(),label="settings",tab_id='tab-settings'),
+        dbc.Tab(tab3_layout(variables),label="settings",tab_id='tab-settings'),
         dbc.Tab(tab2_layout(variables),label='monitoring',tab_id='tab-monit'),
         dbc.Tab(tab4_layout(variables),label='boiler',tab_id='tab-boiler'),
         dbc.Tab(tab5_layout(variables),label='Misc', tab_id='tab-misc'),
@@ -235,6 +236,7 @@ def gen_temps(interval,lt,ht,timer,window,HW):
     t=selectemp(timer,lt,ht)
     variables['lt']=lt
     variables['ht']=ht
+    variables['timer']=timer
     if variables['target'] != t:
         reinit_PID(variables,t)
     populate(sensor,variables)
@@ -269,12 +271,12 @@ def update_CH_b(on):
         txt,style= 'ON', dict(color='firebrick',textAlign= 'center', padding='5px')
         if not variables['CH_flag']:
             logger.debug(f"pressing ON")
-        turn_on(1,scr)
+        #turn_on(1,scr)
     if not on:
         txt,style= 'OFF', dict(color='skyblue',textAlign= 'center', padding='5px')
         if variables['CH_flag']:
             logger.debug(f"pressing OFF")
-        turn_off(1,scr)
+        #turn_off(1,scr)
     return txt,style
 
 @app.callback(
