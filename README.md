@@ -59,12 +59,14 @@ Write a file `ch.service` with the text editor. Change `user` with your user nam
 [Unit]
 Description=Smart home control
 Wants=network-online.target
-After==network-online.target
+After=network-online.target
 
 [Service]
+WorkingDirectory=/home/user/Desktop/ch
+RuntimeDirectory=run/ch
+Environment="script_path=/home/user/Desktop/ch" "LG_WD=/tmp"
 ExecStart=/path/to/new/virtual/environment/bin/python3 /home/user/Desktop/ch/dashprod.py
-User=userEnvironment="script_path=/home/user/Desktop/ch"
-Environment="LG_WD=/tmp"
+User=user
 
 [Install]
 WantedBy=multi-user.target
