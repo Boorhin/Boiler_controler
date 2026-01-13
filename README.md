@@ -50,6 +50,7 @@ Open a shell in your project, run `python3 dashprod.py`
 open http://localhost:8888/ with your favourite browser, chromium is the RPi default one and it does the job. I recommend to press F11 to put it full screen. And tadaaah!
 
 ![Final assembly](./assets/img/final_assembly.jpg)
+
 You can live edit the script for different layouts, levels of logging etc. As long as you don't break the script it will restart automatically.
 
 ## automating the script at startup
@@ -62,7 +63,8 @@ After==network-online.target
 
 [Service]
 ExecStart=/path/to/new/virtual/environment/bin/python3 /home/user/Desktop/ch/dashprod.py
-User=user
+User=userEnvironment="script_path=/home/user/Desktop/ch"
+Environment="LG_WD=/tmp"
 
 [Install]
 WantedBy=multi-user.target

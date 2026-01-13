@@ -37,7 +37,12 @@ logger.setLevel(logging.INFO)
 
 def init_data_record():
     try:
-        lastfile=sorted([os.path.join('logs',l) for l in os.listdir('logs')],key=os.path.getmtime)[-1]
+        files=sorted([os.path.join(os.environ["script_path"],'logs',l) for l in \
+                 os.listdir(os.path.join(os.environ["script_path"],'logs'))],\
+                 key=os.path.getmtime)
+        for log in files[::-1]:
+            if log.endswith(".log") and os.path.getsize(log)>30:
+                lastfile=log
         logger.debug(f'selecting file {lastfile})')
         with open(lastfile,'r') as l:
             logger.debug(f'file {lastfile} opened')
@@ -51,17 +56,17 @@ def init_data_record():
     timestamp='{:%Y-%m-%d_%H:%M:%S}'.format(datetime.now())
     logger.info(f'Initialising data file {timestamp}.log')
     variables=['datetime','temp','Rh','activity(h)']
-    with open(f'logs{os.sep}{timestamp}.log','w') as f:
+    with open(f'{os.environ["script_path"]}{os.sep}logs{os.sep}{timestamp}.log','w') as f:
         for col in variables:
             f.write(f'{col}\t')
         f.write('\n')
     return timestamp,float(lasthours)
 
 def write_record(variables):
-    with open(f"logs{os.sep}{variables['datalog']}.log",'a') as f:
-        f.write('{:%Y-%m-%d_%H:%M:%S}\t'.format(variables['date'][0]))
-        f.write(f'{round(variables['temp'][0],1)}\t')
-        f.write(f'{round(variables['rh'][0],1)}\t')
+    with open(f"{os.environ["script_path"]}{os.sep}logs{os.sep}{variables['datalog']}.log",'a') as f:
+        f.write('{:%Y-%m-%d_%H:%M:%S}\t'.format(variables['date'][-1]))
+        f.write(f'{round(variables['temp'][-1],1)}\t')
+        f.write(f'{round(variables['rh'][-1],1)}\t')
         f.write(f"{round(variables['run']+variables['old run'],2)}\n")
 
 def init_PID(target_temp=16):
@@ -192,7 +197,7 @@ variables["conso"] =variables['sampling']/60 #hours of use
 variables['run']=0
 variables['datalog'],variables['old run']=init_data_record()
 variables['offset']=0
-variables['window']= variables['length']*24 #graphing
+variables['window']= 12 #graphing
 
 onButtonStyle =dict(backgroundColor='skyblue')
 offButtonStyle=dict(backgroundColor='#32383e',borderColor='515960')
@@ -271,12 +276,12 @@ def update_CH_b(on):
         txt,style= 'ON', dict(color='firebrick',textAlign= 'center', padding='5px')
         if not variables['CH_flag']:
             logger.debug(f"pressing ON")
-        #turn_on(1,scr)
+        turn_on(1,scr)
     if not on:
         txt,style= 'OFF', dict(color='skyblue',textAlign= 'center', padding='5px')
         if variables['CH_flag']:
             logger.debug(f"pressing OFF")
-        #turn_off(1,scr)
+        turn_off(1,scr)
     return txt,style
 
 @app.callback(

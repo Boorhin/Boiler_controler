@@ -93,12 +93,12 @@ def tab1_layout():
             dbc.Col([current_mes()]),]),
     ]),
 
-def low_temp(m=12,M=19,h=120):
+def low_temp(variables,m=12,M=19,h=120):
     return dbc.Card([dbc.CardHeader('Low temperature range'),
     dbc.CardBody([
         dcc.Slider(
         id='l_temp_slider',
-        min=m, max=M, step=0.5, value=16,
+        min=m, max=M, step=0.5, value=variables['lt'],
         marks={i: '{}'.format(i) for i in range(m,M+1)},
         tooltip={
         "always_visible": True,
@@ -107,11 +107,11 @@ def low_temp(m=12,M=19,h=120):
         })])
     ], style={'height':f'{h}px'})
 
-def high_temp(m=16,M=22,h=120):
+def high_temp(variables,m=16,M=22,h=120):
     return dbc.Card([dbc.CardHeader('High temperature range'),
     dbc.CardBody([
         dcc.Slider(id='h_temp_slider',
-        min=16, max=22, step=0.5, value=19,
+        min=16, max=22, step=0.5, value=variables['ht'],
         marks={i: '{}'.format(i) for i in range(m,M+1)},
         tooltip={
         "always_visible": True,
@@ -121,11 +121,11 @@ def high_temp(m=16,M=22,h=120):
     ])
     ], style={'height':f'{h}px'})
 
-def hours(h=120):
+def hours(variables,h=120):
     return dbc.Card([dbc.CardHeader('High temperature timer'),
     dbc.CardBody([
          dcc.RangeSlider(id='timer',
-    min=0, max=24, step=0.25, value=[5.75,20.5],
+    min=0, max=24, step=0.25, value=variables['timer'],
     marks={i: '{:02d}:00'.format(i) for i in range(0,25)},
     tooltip={"placement": "bottom", 
     "always_visible": True, 
@@ -134,11 +134,11 @@ def hours(h=120):
     )])
     ], style={'height':f'{h}px'})
 
-def tab3_layout():
+def tab3_layout(variables):
     return dbc.Card([
-    dbc.Row([low_temp()]),
-    dbc.Row([high_temp()]),
-    dbc.Row([hours()])
+    dbc.Row([low_temp(variables)]),
+    dbc.Row([high_temp(variables)]),
+    dbc.Row([hours(variables)])
     ])
 
 
